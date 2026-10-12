@@ -87,17 +87,17 @@ Thí nghiệm `threshold.json` cho thấy ngưỡng đang dùng là 2 bit khác 
 ### Câu 6
 Dựa vào `leakage.json`: chia theo khung hình làm bao nhiêu trip bị chia cắt, so với chia theo trip? Vì sao điều này làm điểm kiểm thử đẹp một cách giả tạo?
 
-(trả lời ở đây)
+`leakage.json` ghi nhận 1.019 frame thuộc 26 trip. Chia ngẫu nhiên theo frame làm cả 26/26 trip xuất hiện ở nhiều split; cả 26 trip còn có frame ở cả train và test. Chia theo trip của Gold làm 0 trip bị chia cắt. Các frame liền nhau trong cùng chuyến thường rất giống nhau, nên nếu cùng trip xuất hiện ở train và test thì mô hình có thể gần như đã thấy cảnh kiểm thử khi học; điểm test vì vậy có thể cao giả tạo.
 
 ### Câu 7
 Vì sao `dataset_version` là **băm nội dung** chứ không phải ngày giờ hay số đếm? Hai lần chạy liên tiếp cho kết quả gì? Vì sao `dataset_version` của bạn **khác** bạn bè dù cùng dữ liệu (liên hệ MSSV)?
 
-(trả lời ở đây)
+`dataset_version` của lần chạy đầu là `c416cb86cd8f`; export lần hai vẫn là `c416cb86cd8f`, với cùng 1.019 frame và cùng SHA256 manifest `2990cd92b24421d291d438ee64d889b35deac42177673653cbfb71cdf32a25da`. Dataset gồm train 717 frame/18 trip, val 155 frame/4 trip và test 147 frame/4 trip. Phiên bản dựa trên nội dung (các `frame_id` cùng split), nên cùng đầu vào và cách chia cho ra cùng phiên bản; ngày giờ hoặc tổng số dòng không phân biệt được hai dataset có nội dung khác nhau. MSSV tham gia xếp trip vào split, nên MSSV khác có thể đổi các cặp frame–split và do đó đổi phiên bản.
 
 ### Câu 8
 Đọc phần `lineage` trong `manifest.json` của dataset bạn. Trả lời "dataset này được tạo từ dữ liệu nào?" bằng chính nội dung đó. Nếu một người hỏi 3 tháng sau, thông tin nào giúp tái tạo lại đúng dataset này?
 
-(trả lời ở đây)
+Trong `manifest.json`, lineage ghi các phiên bản Delta nguồn: `bronze.raw_telemetry_a` v0, `bronze.raw_telemetry_b` v0, `bronze.trips_raw` v0, `bronze.video_files` v1, `silver.frames` v27, `silver.telemetry` v0, `silver.frames_flagged` v0 và `silver.frame_telemetry` v0. Hai video đầu vào có SHA256: drive_a `636ba1a98dfc5ba665d1c935e1d2064e69f4df360ff9ffbd15795957d5e7e9aa`; drive_b `bfa62703f645ff77a8578ae3fc74a00881140d38a404d43c8e2af265bbee9fdc`. Để tái tạo sau này, cần giữ các phiên bản bảng Delta và video khớp SHA256, cùng MSSV và quy tắc trong manifest (lọc khung đen/mờ/gần trùng/mất đồng bộ; chia theo trip, phân tầng theo drive và thứ tự MD5). `dataset_version` nhận diện đầu ra này; `created_at` chỉ ghi thời điểm tạo.
 
 ## Bước 5 · Điều phối và phục vụ
 
