@@ -1,0 +1,2 @@
+# Keep shell scripts LF for Linux containers and WSL.
+*.sh text eol=lf
