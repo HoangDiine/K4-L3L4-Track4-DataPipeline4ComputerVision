@@ -21,7 +21,16 @@
 ### Câu 1
 Liệt kê **ít nhất 4 khác biệt** giữa telemetry nguồn A và nguồn B mà bạn thấy ở bronze. Vì sao pipeline giữ **mỗi nguồn một bảng bronze** và để mọi cột ở dạng chữ, thay vì gộp và ép kiểu ngay?
 
-(trả lời ở đây)
+Ở mẫu Bronze, A dùng `ts_utc=2025-10-07T08:00:00.014Z` theo ISO-8601 UTC, còn B dùng `timestamp_ms=1759933801509` theo epoch milliseconds. Các khác biệt khác:
+
+- Tốc độ: `speed_mps` tính bằng m/s, còn `spd_kmh` tính bằng km/h.
+- Hướng: `heading_deg` so với `hdg`.
+- Tọa độ: `lat`/`lon` so với `latitude`/`longitude`.
+- Độ cao: `alt_m` so với `altitude`.
+- Gia tốc: `acc_x`/`acc_y` so với `ax`/`ay`.
+- Bàn đạp và lái: A có `gas`, `brake`, `steer`; B có `throttle_pct`, `brake_pct`, `steering`. Mẫu gas/brake của A là phần thập phân (0.028, 0.000), còn B là phần trăm (2.0, 0.0).
+
+Bronze giữ A và B ở hai bảng riêng, các cột nguồn ở dạng chữ; kiểm tra cũng thấy 30 giá trị tốc độ trống của A vẫn là chuỗi trống. Cách này giữ nguyên dữ liệu và schema để truy vết, tránh đoán sai đơn vị hoặc làm mất giá trị lỗi khi ép kiểu sớm. Sang Silver, pipeline mới chuẩn hóa timestamp (kể cả độ lệch đồng hồ), đơn vị và kiểu dữ liệu, đồng thời có thể đưa dòng không hợp lệ vào quarantine.
 
 ## Bước 2 · Silver telemetry
 
