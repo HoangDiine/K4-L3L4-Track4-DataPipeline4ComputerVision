@@ -37,12 +37,24 @@ Bronze giữ A và B ở hai bảng riêng, các cột nguồn ở dạng chữ;
 ### Câu 2
 Pipeline đưa hai nguồn về một schema như thế nào (đơn vị, kiểu thời gian, **độ lệch đồng hồ**)? Bằng chứng nào trong kết quả bước 2 cho thấy đã đúng? Dán bảng quarantine của bạn (số dòng theo từng lý do, từng drive) và giải thích vì sao dòng lỗi vào `rejects` thay vì bị xoá.
 
-(trả lời ở đây)
+`stg_telemetry_a.sql` đổi `ts_utc` sang timestamp UTC và giữ `speed_mps` vì A đã dùng m/s. `stg_telemetry_b.sql` đổi `timestamp_ms` epoch-millisecond sang timestamp; trước đó trừ `telemetry_clock_offset_ms=1500` lấy từ metadata video. B đổi `spd_kmh / 3.6` sang m/s, phần trăm ga/phanh chia 100, rồi ánh xạ các tên cột còn lại về schema chung.
+
+Sau chỉnh, telemetry B bắt đầu lúc `2025-10-08 14:30:00.009 UTC`; `video_start_utc` là `2025-10-08 14:30:00.000 UTC`. Sai khác 9 ms, nằm trong ngưỡng kiểm tra 0,5 giây. Bảng Silver có 6.149 dòng sạch và 106 dòng rejects:
+
+| Drive | Đã nhận | Sạch | duplicate | speed_missing | speed_out_of_range | Tổng cách ly |
+|---|---:|---:|---:|---:|---:|---:|
+| drive_a | 3.021 | 2.968 | 20 | 30 | 3 | 53 |
+| drive_b | 3.234 | 3.181 | 20 | 30 | 3 | 53 |
+| Tổng | 6.255 | 6.149 | 40 | 60 | 6 | 106 |
+
+Từng dòng cách ly vẫn có `drive_id`, `ts`, `reject_reason`, `speed_mps`, `_batch_id`, `_row_no`; truy vấn mẫu cho thấy cả duplicate lẫn speed_missing. Giữ dòng cùng lý do và nguồn gốc giúp đếm, điều tra và tái kiểm tra; xoá im lặng sẽ làm mất bằng chứng về loại lỗi và dòng dữ liệu.
 
 ### Câu 3
 Vì sao test `max_gap_ms` là `warn` còn `in_range` là `error`? Kết quả thí nghiệm `break-gate` của bạn (`break_gate.json`): test nào bắt được, bao nhiêu dòng, và điều đó cho biết gì về vai trò của "cổng chất lượng"?
 
-(trả lời ở đây)
+`max_gap_ms` được đặt `severity: warn` trong `schema.yml` vì khoảng trống do cảm biến rớt mẫu cần được báo để điều tra nhưng không nhất thiết làm mọi telemetry còn lại mất giá trị. `in_range` không hạ severity nên mặc định là error: tốc độ ngoài 0–70 m/s là dữ liệu không hợp lệ, cần chặn trước khi đi tiếp. Lượt thường có `PASS=6 WARN=1 ERROR=0`; cảnh báo là `max_gap_ms`.
+
+Trong `report/evidence/break_gate.json`, thí nghiệm nới `max_speed_mps` từ 70 lên 1000 m/s đưa 6 dòng tốc độ bất hợp lý vào Silver. Test `in_range_silver_telemetry_speed_mps__70__0` bắt đúng 6 dòng và làm cổng thất bại: `PASS=5 WARN=1 ERROR=1`. Sau khi script khôi phục luật gốc, kết quả trở lại `PASS=6 WARN=1 ERROR=0`. Điều này cho thấy warn giúp quan sát lỗi có thể chịu đựng, còn error ngăn dữ liệu vi phạm điều kiện bắt buộc đi tiếp.
 
 ## Bước 3 · Silver frames
 
