@@ -61,18 +61,26 @@ Trong `report/evidence/break_gate.json`, thí nghiệm nới `max_speed_mps` t�
 ### Câu 4
 Dựa vào `idempotency.json`: số dòng trước và sau hai lần chạy lại, và khi ghi kiểu `append`. Vì sao Delta `overwrite` theo partition (một trip) an toàn hơn xoá rồi ghi lại, nhất là khi giữa chừng có lỗi?
 
-(trả lời ở đây)
+`report/evidence/idempotency.json` ghi `trip-00003` có 60 frame. Bảng có 1.246 dòng trước khi chạy lại và vẫn 1.246 sau hai lần chạy lại; fingerprint trước/sau đều là `6c7480dfde7e`. Mô phỏng ghi sai kiểu append tạo 120 dòng cho trip 60 frame sau hai lần chạy, tức nhân đôi.
+
+Delta overwrite theo predicate `trip_id` cập nhật riêng partition của trip trong một commit; partition của các trip khác không bị đụng đến và người đọc thấy một phiên bản đã commit. Nếu xoá partition rồi ghi lại thành hai thao tác, lỗi giữa chừng có thể để trip mất dữ liệu; append thì tạo bản sao khi retry.
 
 ### Câu 5
 Khung hình **đen** và khung hình **tối** khác nhau thế nào, pipeline xử lý khác nhau ra sao, bạn có đồng ý không? Dựa vào `threshold.json`: nếu chọn ngưỡng 0, 2, 6 thì bao nhiêu khung bị coi là trùng ở mỗi drive? Bạn chọn ngưỡng nào, vì sao, và ngưỡng đó phụ thuộc vào tốc độ xe thế nào?
 
 | dHash khác tối đa | số khung trùng, drive A | số khung trùng, drive B |
-|---|---|---|
-| 0 | | |
-| 2 | | |
-| 6 | | |
+|---|---:|---:|
+| 0 | 61 | 8 |
+| 2 | 149 | 53 |
+| 6 | 363 | 244 |
 
-(trả lời ở đây)
+Mình đồng ý với việc tách khung đen khỏi khung tối. Trên MinIO, `silver/frames/drive_a/01001.jpg` là khung đen (cờ `is_black`, brightness 0, lệch telemetry 18 ms); `drive_a/01998.jpg` bị mờ (cờ `is_blurry`, blur_score 2,485, lệch 16 ms). `drive_b/00030.jpg` là cảnh tối trong hầm nhưng vẫn thấy đường và cảnh vật (`is_dark=true`, `is_black=false`, brightness 23,07, lệch 98 ms). Đây là khung tối được giữ, không phải ảnh đen.
+
+Bước 3 đếm drive_a có 602 frame: 6 đen, 9 mờ, 4 tối được giữ, 149 gần trùng và 7 mất đồng bộ. drive_b có 644 frame: 4 đen, 0 mờ, 61 tối được giữ, 53 gần trùng và 7 mất đồng bộ. Các cờ có thể chồng lấp nên không cộng các cột thành tổng loại trừ nhau. Ở Silver frame được gắn cờ; khi tạo Gold, pipeline loại frame đen, mờ, gần trùng hoặc mất đồng bộ, còn cờ tối không làm frame bị loại.
+
+Độ trễ frame–telemetry trung bình/tối đa là 66/2.884 ms ở drive_a và 73/3.112 ms ở drive_b. Các mẫu trên lệch 16–98 ms.
+
+Thí nghiệm `threshold.json` cho thấy ngưỡng đang dùng là 2 bit khác nhau; mình giữ ngưỡng 2 vì ngưỡng 0 chỉ bắt 61/8 frame, còn ngưỡng 6 tăng lên 363/244 và có nguy cơ loại cả ảnh khác nhau thật. Ở tốc độ lấy mẫu 2 FPS, xe chạy chậm thường làm cảnh giữa hai frame giống nhau hơn; xe chạy nhanh làm cảnh dịch chuyển nhiều hơn trong 0,5 giây. Vì vậy tốc độ ảnh hưởng số frame gần trùng, nhưng tăng ngưỡng để bù có thể tạo false positive; cần hiệu chỉnh theo chuyển động và kiểm tra mẫu thay vì nâng ngưỡng máy móc.
 
 ## Bước 4 · Gold
 
