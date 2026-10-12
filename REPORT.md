@@ -5,8 +5,8 @@
 | | |
 |---|---|
 | Họ và tên | `<điền>` |
-| MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | `<điền>` |
-| GitHub | `<điền: tên tài khoản>` |
+| MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | 2A202602751 |
+| GitHub | HoangDiine |
 | Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `<điền: trip-xxxxx>` |
 
 ## Kết quả cuối
