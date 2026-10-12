@@ -4,17 +4,17 @@
 
 | | |
 |---|---|
-| Họ và tên | `<điền>` |
+| Họ và tên | Hoàng Duy |
 | MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | 2A202602751 |
 | GitHub | HoangDiine |
-| Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `<điền: trip-xxxxx>` |
+| Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `trip-04868` |
 
 ## Kết quả cuối
 
 - `dataset_version` của bạn: `c416cb86cd8f`  (phải khớp `report/evidence/run_summary.json`)
 - Số khung hình train / val / test của bạn: `717 / 155 / 147`
 - `report/verify.txt`: tạo bằng `python3 scripts/check_submission.py --save-verify` (phải có `27/27 checks passed`).
-- Ảnh chụp trong `report/screenshots/`: `airflow_graph.png`, `minio_lake.png`, `metabase_dashboard.png`, và ảnh bài tập sập/chạy lại (log task đỏ thấy trip của bạn).
+- Ảnh chụp trong `report/screenshots/`: `airflow_graph.png`, `airflow_retry_graph.png`, `fail_task_log.png`, `minio_lake.png`, `metabase_dashboard.png`.
 
 ## Bước 1 · Bronze
 
@@ -104,21 +104,31 @@ Trong `manifest.json`, lineage ghi các phiên bản Delta nguồn: `bronze.raw_
 ### Câu 9
 Mô tả chính xác điều xảy ra khi trip của bạn sập rồi chạy lại: bao nhiêu task chuyển đỏ, bao nhiêu task `upstream_failed`, bạn clear gì, dữ liệu có nhân đôi không, `dataset_version` có đổi không? Bằng chứng (ảnh, số) là gì?
 
-(trả lời ở đây)
+Vì MSSV của mình có chữ `A`, biểu thức `int(MSSV)` trong ví dụ GUIDE không parse được; dùng phần số `202602751 % 26 = 13`, tương ứng `trip-04868`. Ở run `manual__2026-10-12T18:26:21.102655+00:00`, task `silver_frames` tại `map_index=13` đỏ sau lỗi “simulated crash while extracting trip-04868”; 25/26 task map khác thành công và 7 task sau là `upstream_failed`. Mình clear đúng task đỏ; Airflow đưa task đó cùng 7 downstream vào lượt chạy lại (8 task bị clear theo quan hệ phụ thuộc), không chạy lại 26 trip hay toàn DAG. Task lỗi thành công ở lần thử thứ hai, DAG xanh; verify đạt 27/27, Gold vẫn 1.019 frame, `frame_id` duy nhất và `dataset_version=c416cb86cd8f` không đổi nên retry không nhân đôi dữ liệu. Ảnh log đã lưu tại `report/screenshots/fail_task_log.png`; số liệu đối chiếu trong `report/verify.txt`.
 
 ### Câu 10
 Nâng từ 2 drive lên **500 xe mỗi ngày**: ba thành phần nào của pipeline này sẽ vỡ đầu tiên, và bạn thay bằng gì (nối với slide 12, 22, 23)?
 
-(trả lời ở đây)
+Ba nút nghẽn mình dự đoán là: (1) giải mã FFmpeg/CPU cho video — DAG hiện giới hạn `silver_frames` còn một mapped task hoạt động mỗi DAG run, nên chuyển sang Celery/Kubernetes executor với worker autoscale và queue theo trip; (2) MinIO/object storage — hàng trăm xe tạo nhiều video, ảnh nhỏ và file Delta, nên dùng object storage phân tán, ghi theo lô và compaction/partition để giảm small-file/listing overhead; (3) Postgres warehouse/Metabase — gallery và marts tăng theo số frame, nên chuyển workload phân tích sang warehouse dạng cột như ClickHouse/BigQuery và phục vụ dashboard bằng aggregate/materialized views. Repo không có nội dung slide 12/22/23 để đối chiếu tiêu đề; nhận định này dựa trên kiến trúc hiện tại trong README/GUIDE, đặc biệt các phần object storage, orchestration, decode và warehouse.
 
 ## Câu hỏi riêng của bạn trên Metabase
 
 Câu SQL bạn thêm vào dashboard và điều nó cho biết:
 
-(trả lời ở đây)
+Câu hỏi: mỗi split có bao nhiêu frame Gold từ từng drive, và tốc độ trung bình của các frame đó là bao nhiêu?
+
+```sql
+select split, drive_id, count(*) as gold_frames,
+       round(avg(speed_kmh)::numeric, 1) as avg_speed_kmh
+from marts.mart_frame_gallery
+group by split, drive_id
+order by split, drive_id;
+```
+
+Kết quả có 6 dòng: test A/B là 58/89 frame với 44,4/91,2 km/h; train là 325/392 với 41,7/67,7 km/h; val là 53/102 với 23,9/62,5 km/h. B đóng góp 583/1.019 frame và có tốc độ trung bình cao hơn A trong cả ba split. Câu hỏi đã lưu tên “Gold frames and average speed by split and drive” và được thêm vào dashboard Day 9.
 
 ## Nhìn lại
 
 Điều bạn thấy bất ngờ nhất, điều gì còn chưa rõ, và một lỗi dữ liệu mà bạn nghĩ pipeline **chưa** bắt được (nếu có). Tối đa 8 dòng.
 
-(trả lời ở đây)
+Điều bất ngờ nhất là clear đúng một trip có thể cho Airflow chạy tiếp phần downstream mà không cần reset cả pipeline. Dấu vết trip và verify giúp kiểm tra retry có giữ được tính idempotent. Một lỗi còn có thể lọt là clock drift tăng dần trong video: trừ một offset cố định có thể khớp đầu video nhưng lệch ở cuối.
