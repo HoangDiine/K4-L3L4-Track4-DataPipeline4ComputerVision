@@ -14,7 +14,7 @@
 - `dataset_version` của bạn: `c416cb86cd8f`  (phải khớp `report/evidence/run_summary.json`)
 - Số khung hình train / val / test của bạn: `717 / 155 / 147`
 - `report/verify.txt`: tạo bằng `python3 scripts/check_submission.py --save-verify` (phải có `27/27 checks passed`).
-- Ảnh chụp trong `report/screenshots/`: `airflow_graph.png`, `airflow_retry_graph.png`, `fail_task_log.png`, `minio_lake.png`, `metabase_dashboard.png`.
+- Ảnh chụp trong `report/screenshots/`: `airflow_graph.png`, `airflow_retry_graph.png`, `fail_task_log.png`, `minio_lake.png`, `metabase_dashboard.png`, `metabase_gallery_split.png`, `metabase_quality_overview.png`.
 
 ## Bước 1 · Bronze
 
@@ -97,7 +97,7 @@ Vì sao `dataset_version` là **băm nội dung** chứ không phải ngày gi�
 ### Câu 8
 Đọc phần `lineage` trong `manifest.json` của dataset bạn. Trả lời "dataset này được tạo từ dữ liệu nào?" bằng chính nội dung đó. Nếu một người hỏi 3 tháng sau, thông tin nào giúp tái tạo lại đúng dataset này?
 
-Trong `manifest.json`, lineage ghi các phiên bản Delta nguồn: `bronze.raw_telemetry_a` v0, `bronze.raw_telemetry_b` v0, `bronze.trips_raw` v0, `bronze.video_files` v1, `silver.frames` v27, `silver.telemetry` v0, `silver.frames_flagged` v0 và `silver.frame_telemetry` v0. Hai video đầu vào có SHA256: drive_a `636ba1a98dfc5ba665d1c935e1d2064e69f4df360ff9ffbd15795957d5e7e9aa`; drive_b `bfa62703f645ff77a8578ae3fc74a00881140d38a404d43c8e2af265bbee9fdc`. Để tái tạo sau này, cần giữ các phiên bản bảng Delta và video khớp SHA256, cùng MSSV và quy tắc trong manifest (lọc khung đen/mờ/gần trùng/mất đồng bộ; chia theo trip, phân tầng theo drive và thứ tự MD5). `dataset_version` nhận diện đầu ra này; `created_at` chỉ ghi thời điểm tạo.
+Trong `manifest.json`, lineage ghi các phiên bản Delta nguồn: `bronze.raw_telemetry_a` v0, `bronze.raw_telemetry_b` v0, `bronze.trips_raw` v0, `bronze.video_files` v1, `silver.frames` v25, `silver.telemetry` v0, `silver.frames_flagged` v0 và `silver.frame_telemetry` v0. Hai video đầu vào có SHA256: drive_a `636ba1a98dfc5ba665d1c935e1d2064e69f4df360ff9ffbd15795957d5e7e9aa`; drive_b `bfa62703f645ff77a8578ae3fc74a00881140d38a404d43c8e2af265bbee9fdc`. Để tái tạo sau này, cần giữ các phiên bản bảng Delta và video khớp SHA256, cùng MSSV và quy tắc trong manifest (lọc khung đen/mờ/gần trùng/mất đồng bộ; chia theo trip, phân tầng theo drive và thứ tự MD5). `dataset_version` nhận diện đầu ra này; `created_at` chỉ ghi thời điểm tạo.
 
 ## Bước 5 · Điều phối và phục vụ
 
@@ -125,7 +125,7 @@ group by split, drive_id
 order by split, drive_id;
 ```
 
-Kết quả có 6 dòng: test A/B là 58/89 frame với 44,4/91,2 km/h; train là 325/392 với 41,7/67,7 km/h; val là 53/102 với 23,9/62,5 km/h. B đóng góp 583/1.019 frame và có tốc độ trung bình cao hơn A trong cả ba split. Câu hỏi đã lưu tên “Gold frames and average speed by split and drive” và được thêm vào dashboard Day 9.
+Kết quả có 6 dòng: test A/B là 58/89 frame với 44,4/91,2 km/h; train là 325/392 với 41,7/67,7 km/h; val là 53/102 với 23,9/62,5 km/h. B đóng góp 583/1.019 frame và có tốc độ trung bình cao hơn A trong cả ba split. Câu hỏi đã lưu tên “Gold frames and average speed by split and drive” và được thêm vào dashboard Day 9. Hai ảnh chi tiết bổ sung: [gallery và số frame theo split](report/screenshots/metabase_gallery_split.png), [quality, quarantine và cân bằng split](report/screenshots/metabase_quality_overview.png).
 
 ## Nhìn lại
 
